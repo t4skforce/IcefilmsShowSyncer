@@ -325,7 +325,7 @@ class IcefilmsShowSyncer(Hook):
                   ("showsBaseDir", "str", "Directory containing all series subdirectories", "/tvshows"),
                   ("showsCfgFile", "str", "Config file specifying all shows to sync", "icefilmsShowSyncer.conf"),
                   ("preferredHosters", "str", "comma-separated list of preferred file hosters", "")]
-    __author_name__ = ("draugr")
+    __author_name__ = ("t4skforce")
     __running__ = False
     __threaded__ = ["downloadFinished"]
 
