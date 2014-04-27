@@ -19,8 +19,8 @@ The software is provided under the GPL v3 so feel free to fork or be so kind and
 *  working install of [pyLoad](http://pyload.org/)
 
 ## Installation:
-1. Download [master.zip](https://github.com/t4skforce/IcefilmsShowSyncer/archive/master.zip) 
-2. Extract master.zip unzip,7zip
+1. Download [IcefilmsShowSyncer.zip](https://github.com/t4skforce/IcefilmsShowSyncer/archive/master.zip) 
+2. Extract IcefilmsShowSyncer.zip unzip,7zip
 3. Copy file icefilmsShowSyncer.py to `<pyload install dir>/module/plugins/hooks/`
 4. Copy file icefilmsShowSyncer.conf to .pyload/ (pyload config folder)
 5. Optional edit icefilmsShowSyncer.conf
