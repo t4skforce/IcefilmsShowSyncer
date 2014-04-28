@@ -88,6 +88,7 @@ class Show():
                 continue
                         
             if ep.refreshDownloadLink():
+                self.hook.logDebug('downloading => %s - S%02dE%02d - %s' % (self.showName, ep.seasonNum,ep.episodeNum,ep.episodeName))
                 self.episodesToDownload.append({'season': ep.seasonNum, 'episode': ep.episodeNum, \
                         'name': ep.episodeName, 'url': ep.url['download'], 'showDir': self.showDir})
                 #ep.printInfo()
@@ -247,11 +248,15 @@ class Episode():
             for a in div.findAll('a', attrs={'onclick': re.compile('go\(\d+\)')}):
                 hn = a.find('span')
                 if not hn:
-                    self.show.hook.logWarning( 'Name of file hoster not found' )
-                    self.show.hook.logDebug(hn.getText())
-                    continue
-                hoster = hn.getText().strip().lower()
-                #self.show.hook.logDebug(hoster)
+                    img = a.find('img')
+                    if not img:
+                        self.show.hook.logWarning('Name of file hoster not found')
+                        self.show.hook.logDebug(a)
+                        continue
+                    else:
+                        hoster = img["alt"].strip().lower()
+                else:
+                    hoster = hn.getText().strip().lower()
                 
                 # if more than one file per hoster is available, 
                 # some idÂ´s get overridden, but thats ok. We only need one dlink...
