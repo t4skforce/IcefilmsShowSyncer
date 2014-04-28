@@ -86,6 +86,10 @@ excludedSeasons = 1 3
 **excludedSeasons** 
 
 	exclude whole season
+	
+**queue**
+
+    start download immediately. parameter is optional, defaults to plugin config "Move new episodes directly to queue"
 
 
 Example is shipped with 2 series configs.
@@ -93,12 +97,14 @@ Example is shipped with 2 series configs.
 ## Info
 
 *  When adding a lot of episodes it can take some time until all the download links are found (please give it some time)
-*  Plugin only adds missing Episodes. If you already got it downloaded or it is not allowed to download via `excludedEpisodes` or `excludedSeasons` the inks will not be added
-*  When canging the icefilmsShowSyncer.conf file eather restart pyload or disable and reenable the plugin in pyload 
+*  Plugin only adds missing Episodes. If you already got it downloaded or it is not allowed to download via `excludedEpisodes` or `excludedSeasons` the links will not be added
+*  When canging the icefilmsShowSyncer.conf wait for the reschedule of the hook or restart your pyload server to take immediately effect
 *  If something is not working, please create an issue on [github](https://github.com/t4skforce/IcefilmsShowSyncer/issues "Issues") and provide complete log of pyload in debug mode
 
 ## Changelog
 
 Version 0.6:
    *   Fixed issue with "No download Id found for ..."
-   *   changed default behavior of "Directory containing all series subdirectories" which now is a forced subdirectory of <base_download_folder pyload>
+   *   changed default behavior of "Directory containing all series subdirectories" which is now prefixed with pyload default download_folder
+       absolute paths are still possible for paths beginning with "/"
+   *   added optional parameter "queue" to series config

@@ -25,6 +25,7 @@ from module.plugins.Hook import Hook
 from module.utils import save_join, save_path, html_unescape
 from shutil import move
 from time import sleep
+import hashlib
 
 baseUrl = "http://www.icefilms.info"
 
@@ -43,14 +44,16 @@ def extractSeasonAndEpisodeNum(episodeString):
     
 
 class Show():
-    def __init__(self, hook, showDir, showUrl, hd, exclSeasons, exclEpisodes, format):
+    def __init__(self, hook, showName, showDir, showUrl, hd, exclSeasons, exclEpisodes, format, queue):
         self.hook = hook
+        self.showName = showName
         self.showDir = showDir
         self.showUrl = showUrl
         self.hd = hd
         self.exclSeasons = exclSeasons
         self.exclEpisodes = exclEpisodes
         self.format = format
+        self.queue = queue
         
         self.httpReq = self.hook.core.requestFactory.getRequest(hook.__name__)
         self.episodesOnDisk = {}
@@ -77,11 +80,13 @@ class Show():
             if ep.seasonNum == -1:
                 self.hook.logError('Unable to extract episode info from %s' % a.string)
                 continue
-            if self.onDiskAlready(ep.seasonNum, ep.episodeNum):
-                continue
             if self.excluded(ep.seasonNum, ep.episodeNum):
+                self.hook.logDebug('skipping, excluded => %s - S%02dE%02d - %s' % (self.showName, ep.seasonNum,ep.episodeNum,ep.episodeName))
                 continue
-        
+            if self.onDiskAlready(ep.seasonNum, ep.episodeNum):
+                self.hook.logDebug('skipping, already downloaded => %s - S%02dE%02d - %s' % (self.showName, ep.seasonNum,ep.episodeNum,ep.episodeName))
+                continue
+                        
             if ep.refreshDownloadLink():
                 self.episodesToDownload.append({'season': ep.seasonNum, 'episode': ep.episodeNum, \
                         'name': ep.episodeName, 'url': ep.url['download'], 'showDir': self.showDir})
@@ -110,7 +115,7 @@ class Show():
             else:
                 filepath = save_join(ep['showDir'], "%(season)02dx%(episode)02d - %(name)s" % \
                                 {'season': ep['season'], 'episode': ep['episode'], 'name': ep['name'] })
-            
+            # save url for lookup later
             self.hook.setStorage(ep['url'], filepath)
 
     def loadEpisodesOnDisk(self, showDir):
@@ -123,7 +128,7 @@ class Show():
                         self.episodesOnDisk[(seasonNum,episodeNum)] = 1
                 else:
                     self.loadEpisodesOnDisk(save_join(showDir,entry))
-        except:
+        except Exception,e:
             pass
     
     def onDiskAlready(self, seasonNum, episodeNum):
@@ -168,7 +173,7 @@ class Show():
             return
         
         packageName = os.path.split(self.showDir)[1]
-        self.hook.core.api.addPackage(packageName.encode("utf-8"), downloadUrls, 1 if self.hook.getConfig("queue") else 0)
+        self.hook.core.api.addPackage(packageName.encode("utf-8"), downloadUrls, 1 if self.queue else 0)
 
     def getDownloadUrls(self):
         urls = []
@@ -191,6 +196,9 @@ class Show():
                 else:
                     sleep(0.2)
         return html
+    
+    def __str__(self):
+        return "{ showDir:%s, showUrl:%s, hd:%s, exclSeasons:%s, exclEpisodes:%s, format:%s, queue:%s }" %(self.showDir,self.showUrl,self.hd,self.exclSeasons,self.exclEpisodes,self.format,self.queue)
             
 
 class Episode():
@@ -322,23 +330,21 @@ class IcefilmsShowSyncer(Hook):
                   ("queue", "bool", "Move new episodes directly to queue", True),
                   ("renameAndMoveFile", "bool", "Rename and move downloaded file to series dir", True),
                   ("format", "{show name}/Season 01/S01E01 - {episode name};{show name}/Season 01/1x01 - {episode name};{show name}/S01E01 - {episode name};{show name}/1x01 - {episode name}", "Naming scheme<br>(used by 'rename and move')", ""),
-                  ("showsBaseDir", "str", "Directory containing all series subdirectories", "/tvshows"),
-                  ("showsCfgFile", "str", "Config file specifying all shows to sync", "icefilmsShowSyncer.conf"),
+                  ("showsBaseDir", "folder", "Directory containing all series subdirectories", "./"),
+                  ("showsCfgFile", "file", "Config file specifying all shows to sync", "./icefilmsShowSyncer.conf"),
                   ("preferredHosters", "str", "comma-separated list of preferred file hosters", "")]
     __author_name__ = ("t4skforce")
     __running__ = False
     __threaded__ = ["downloadFinished"]
-
-
+    
     def setup(self):
         self.interval = self.getConfig("interval") * 3600
-        
         
     def configIsValid(self):
         """Checks hook config and returns True if config is valid otherwise False. Writes info to log."""
         valid = True
         
-        showsBaseDir = save_join(self.core.api.getConfigValue('general','download_folder'),self.getConfig("showsBaseDir"))
+        showsBaseDir = self.getConfig("showsBaseDir")
         if not exists(showsBaseDir):
             self.logError('Shows base directory "%s" doesn\'t exist.' % showsBaseDir)
             valid = False
@@ -378,7 +384,15 @@ class IcefilmsShowSyncer(Hook):
             if not re.match( r'(\d+[\s;,]?)*', seriesCfg.get(series, 'excludedSeasons'), re.I ):
                 self.logError('Format of seasons to ignore invalid')
                 valid = False
-        except:
+                
+            # allow queue config per series, default with global config
+            try:
+                seriesCfg.get(series, 'queue')
+            except ConfigParser.NoOptionError:
+                seriesCfg.set(series, 'queue',str(self.getConfig("queue")))    
+                
+        except Exception,e:
+            self.logError(type(e))
             self.logError('Invalid value or parameter not found: [%(seriesName)s] -> %(param)s' % {'seriesName': series, 'param': paramName })
             valid = False
         return valid
@@ -429,10 +443,12 @@ class IcefilmsShowSyncer(Hook):
             showExclEpisodes = re.findall(r'\w+', seriesCfg.get(showName, 'excludedEpisodes').lower())
             showExclSeasons = re.findall(r'\w+', seriesCfg.get(showName, 'excludedSeasons'))
             showDirFmt = self.getConf('format')
-            showsBaseDir = save_join(self.core.api.getConfigValue('general','download_folder'),self.getConfig("showsBaseDir"))
-            showDir = save_join(showsBaseDir , save_path(showName))
-        
-            show = Show(self, showDir, showUrl, showHdPreferred, showExclSeasons, showExclEpisodes, showDirFmt)
+            showsBaseDir = self.getConfig("showsBaseDir")
+            showDir = save_join(self.core.api.getConfigValue('general','download_folder'), showsBaseDir , save_path(showName))
+            queue = seriesCfg.getboolean(showName, 'queue')
+            self.logDebug("%s queue=%s"%(showName,queue))
+            show = Show(self, showName, showDir, showUrl, showHdPreferred, showExclSeasons, showExclEpisodes, showDirFmt, queue)
+            self.logDebug(show)
             show.syncronize()
             
         self.logInfo('Finished')
@@ -456,6 +472,9 @@ class IcefilmsShowSyncer(Hook):
             packageDir = self.core.api.getPackageInfo(pyfile.packageid).folder
             sourcefile = save_join(downloadDir, packageDir, pyfile.name )
             
+            # generate relative target filename
+            targetfile = save_join(downloadDir, os.pathsep, targetfile)
+            
             if exists( sourcefile ):
                 if not exists( targetfile ):
                     # create target dir
@@ -469,7 +488,7 @@ class IcefilmsShowSyncer(Hook):
                     move(sourcefile, targetfile)
                     # check if moved
                     if exists( targetfile ):
-                        self.logInfo('Moved %(sourcefile)s to %(targetfile)s' % {'sourcefile': pyfile.name, 'targetfile': targetfile})
+                        self.logInfo('Moved %(sourcefile)s to %(targetfile)s' % {'sourcefile': sourcefile, 'targetfile': targetfile})
                         # try to delete source dir if moved successfully
                         try:
                             os.rmdir(os.path.split(sourcefile)[0])
