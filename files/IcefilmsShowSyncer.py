@@ -477,9 +477,6 @@ class IcefilmsShowSyncer(Hook):
             packageDir = self.core.api.getPackageInfo(pyfile.packageid).folder
             sourcefile = save_join(downloadDir, packageDir, pyfile.name )
             
-            # generate relative target filename
-            targetfile = save_join(downloadDir, os.pathsep, targetfile)
-            
             if exists( sourcefile ):
                 if not exists( targetfile ):
                     # create target dir
