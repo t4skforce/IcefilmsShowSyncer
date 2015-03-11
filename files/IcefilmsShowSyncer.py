@@ -91,8 +91,7 @@ class Show():
                 self.hook.logDebug('downloading => %s - S%02dE%02d - %s' % (self.showName, ep.seasonNum,ep.episodeNum,ep.episodeName))
                 self.episodesToDownload.append({'season': ep.seasonNum, 'episode': ep.episodeNum, \
                         'name': ep.episodeName, 'url': ep.url['download'], 'showDir': self.showDir})
-                #ep.printInfo()
-        
+
         # prevent duplicate downloads, add downloads and store target filepath of file url
         self.removeAlreadyQueuedEpisodes()
         self.addDownloads()
